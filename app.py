@@ -45,7 +45,7 @@ x = layers.LayerNormalization(epsilon=1e-6, name="ln_final")(x)
 logits = layers.Dense(VOCAB, name="lm_head")(x)
 
 model = tf.keras.Model(inp, logits)
-model.load_weights("assistant_gpt_weights.h5")
+model.load_weights("assistant_gpt_weights.weights.h5")
 
 # --- 4. دالة التوليد (Inference) ---
 def predict_response(message, history):
