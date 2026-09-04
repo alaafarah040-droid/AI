@@ -1,0 +1,6 @@
+
+flask
+tensorflow-cpu
+tokenizers
+numpy
+gunicorn
