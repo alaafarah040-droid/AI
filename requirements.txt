@@ -1,6 +1,6 @@
-gradio
 flask
 tensorflow-cpu
 tokenizers
 numpy
 gunicorn
+gradio
