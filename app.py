@@ -47,7 +47,12 @@ logits = layers.Dense(VOCAB, name="lm_head")(x)
 model = tf.keras.Model(inp, logits)
 model.load_weights("assistant_gpt_weights.weights.h5")
 
-# --- 4. دالة التوليد (Inference) ---
+# تسريع الرسم البياني للتنفيذ بواسطة tf.function
+@tf.function(reduce_retracing=True)
+def fast_predict(inp_tensor):
+    return model(inp_tensor, training=False)
+
+# --- 4. دالة التوليد (Inference) المحسّنة ---
 def predict_response(message, history):
     context = ""
     for user_msg, bot_msg in history:
@@ -56,24 +61,29 @@ def predict_response(message, history):
     context += f"<|user|> {message} <|assistant|>"
     input_ids = tok.encode(context).ids
     
-    if len(input_ids) > (MAX_LEN - 1) - 50:
-        input_ids = input_ids[-((MAX_LEN - 1) - 50):]
+    max_input_length = (MAX_LEN - 1) - 40
+    if len(input_ids) > max_input_length:
+        input_ids = input_ids[-max_input_length:]
         
     generated = list(input_ids)
     
-    for _ in range(50):
-        curr_input = generated[-(MAX_LEN - 1):]
-        pad_len = (MAX_LEN - 1) - len(curr_input)
-        padded_input = curr_input + [PAD] * pad_len
+    for _ in range(40):
+        seq_len = len(generated)
+        if seq_len >= (MAX_LEN - 1):
+            break
+            
+        pad_len = (MAX_LEN - 1) - seq_len
+        padded_input = generated + [PAD] * pad_len
         
         inp_tensor = tf.constant([padded_input], dtype=tf.int32)
-        logits = model(inp_tensor, training=False)
+        logits = fast_predict(inp_tensor)
         
-        next_token_logits = logits[0, len(curr_input) - 1, :] / 0.4
-        top_k_logits, top_k_indices = tf.math.top_k(next_token_logits, k=20)
+        next_token_logits = logits[0, seq_len - 1, :] / 0.7
+        top_k_logits, top_k_indices = tf.math.top_k(next_token_logits, k=10)
         probs = tf.nn.softmax(top_k_logits).numpy()
         
-        next_token = top_k_indices.numpy()[np.argmax(probs)]
+        next_token_idx = np.random.choice(len(probs), p=probs)
+        next_token = top_k_indices.numpy()[next_token_idx]
         
         if next_token == EOS or next_token == PAD:
             break
@@ -93,6 +103,4 @@ demo = gr.ChatInterface(
 )
 
 if __name__ == "__main__":
-    demo.launch()
-
-demo.launch(server_name="0.0.0.0", server_port=10000)
+    demo.launch(server_name="0.0.0.0", server_port=10000)
