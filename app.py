@@ -14,8 +14,9 @@ N_HEADS = 8
 FF_DIM = 1024
 DROPOUT = 0.0
 
+# الأسماء المطبقة في مستودعك الخاص
 TOKENIZER_PATH = "assistant_bpe_tokenizer.json"
-WEIGHTS_PATH = "model_weights.h5"  # أو قم بتحميل النموذج كاملاً إذا كان محفوطاً بصيغة keras
+WEIGHTS_PATH = "assistant_gpt_weights.weights.h5"
 
 # --- 2. Load Tokenizer ---
 if not os.path.exists(TOKENIZER_PATH):
@@ -50,7 +51,7 @@ def create_model():
     inputs = layers.Input(shape=(None,), dtype="int32", name="tokens")
     tok_emb = layers.Embedding(VOCAB_SIZE, EMBED_DIM, name="tok_emb")(inputs)
     
-    # Static positional embeddings setup up to MAX_LEN
+    # Static positional embeddings setup
     pos_ids = tf.range(start=0, limit=tf.shape(inputs)[1], delta=1)
     pos_emb = layers.Embedding(MAX_LEN, EMBED_DIM, name="pos_emb")(pos_ids)
     
@@ -67,12 +68,12 @@ def create_model():
 
 model = create_model()
 
-# Load Weights if available
+# Load Weights
 if os.path.exists(WEIGHTS_PATH):
     model.load_weights(WEIGHTS_PATH)
     print("تم تحميل أوزان النموذج بنجاح!")
 else:
-    print("تنبيه: لم يتم العثور على أوزان محفوطة، سيتم استخدام أوزان عشوائية للنموذج.")
+    print(f"تنبيه: لم يتم العثور على ملف الأوزان {WEIGHTS_PATH}")
 
 # --- 4. Generation Logic ---
 def sample_next_token(logits, temperature=0.7, top_k=40):
@@ -90,7 +91,6 @@ def generate_response(prompt, max_new_tokens=60, temperature=0.7, top_k=40):
     input_ids = tok.encode(formatted_prompt).ids
 
     for _ in range(max_new_tokens):
-        # Truncate context if it exceeds max context length
         cond_ids = input_ids[-MAX_LEN:]
         tensor_input = tf.constant([cond_ids], dtype=tf.int32)
         
@@ -104,7 +104,6 @@ def generate_response(prompt, max_new_tokens=60, temperature=0.7, top_k=40):
             
         input_ids.append(next_token)
 
-    # Decode only the generated response after <|assistant|>
     generated_text = tok.decode(input_ids)
     if "<|assistant|>" in generated_text:
         response = generated_text.split("<|assistant|>")[-1].replace("<EOS>", "").strip()
@@ -119,7 +118,7 @@ def chat_fn(message, history):
 demo = gr.ChatInterface(
     fn=chat_fn,
     title="🤖 Tiny AI Assistant",
-    description="نموذج توليد نصوص صغير (8.8M Parameters) مدرب باستخدام Causal Transformer و Byte-level BPE Tokenizer.",
+    description="نموذج توليد نصوص صغير مدرب باستخدام Causal Transformer و Byte-level BPE Tokenizer.",
     examples=["How do I boil an egg?", "Give three tips for staying healthy.", "Hello! How are you?"]
 )
 
